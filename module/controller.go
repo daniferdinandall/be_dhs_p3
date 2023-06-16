@@ -153,7 +153,7 @@ func InsertMhs(db *mongo.Database, npm int, nama string, fakultas model.Fakultas
 	mhs.ProgramStudi = programStudi
 	// mhs.CreatedAt = primitive.NewDateTimeFromTime(time.Now().UTC())
 	// return InsertOneDoc("db_dhs_tb", "mahasiswa", mhs)
-	result, err := db.Collection("dhs").InsertOne(context.Background(), mhs)
+	result, err := db.Collection("mahasiswa").InsertOne(context.Background(), mhs)
 	if err != nil {
 		fmt.Printf("InsertPresensi: %v\n", err)
 		return
@@ -175,7 +175,7 @@ func GetMhsFromNPM(db *mongo.Database, npm int) (mhs model.Mahasiswa, errs error
 	return mhs, nil
 }
 
-func GetMhsFromID(db *mongo.Database, _id primitive.ObjectID) (hasil model.Dhs, errs error) {
+func GetMhsFromID(db *mongo.Database, _id primitive.ObjectID) (hasil model.Mahasiswa, errs error) {
 	data := db.Collection("mahasiswa")
 	filter := bson.M{"_id": _id}
 	err := data.FindOne(context.TODO(), filter).Decode(&hasil)
@@ -207,11 +207,11 @@ func UpdateMhsById(db *mongo.Database, id primitive.ObjectID, npm int, nama stri
 	filter := bson.M{"_id": id}
 	update := bson.M{
 		"$set": bson.M{
-			"Npm":          npm,
-			"Nama":         nama,
-			"Fakultas":     fakultas,
-			"DosenWali":    dosen,
-			"ProgramStudi": programStudi,
+			"npm":           npm,
+			"nama":          nama,
+			"fakultas":      fakultas,
+			"program_studi": dosen,
+			"dosen_wali":    programStudi,
 		},
 	}
 	result, err := db.Collection("mahasiswa").UpdateOne(context.Background(), filter, update)
@@ -248,7 +248,7 @@ func InsertDosen(db *mongo.Database, kode string, nama string, hp string) (inser
 	dosen.KodeDosen = kode
 	dosen.Nama = nama
 	dosen.PhoneNumber = hp
-	result, err := db.Collection("dhs").InsertOne(context.Background(), dosen)
+	result, err := db.Collection("dosen").InsertOne(context.Background(), dosen)
 	if err != nil {
 		fmt.Printf("InsertPresensi: %v\n", err)
 		return
@@ -271,7 +271,7 @@ func GetDosenFromKodeDosen(db *mongo.Database, kode string) (dosen model.Dosen, 
 }
 func GetDosenFromID(db *mongo.Database, id primitive.ObjectID) (dosen model.Dosen, errs error) {
 	data_dhs := MongoConnect("db_dhs_tb").Collection("dosen")
-	filter := bson.M{"kode_dosen": id}
+	filter := bson.M{"_id": id}
 	err := data_dhs.FindOne(context.TODO(), filter).Decode(&dosen)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -301,9 +301,9 @@ func UpdateDosenByID(db *mongo.Database, id primitive.ObjectID, kode string, nam
 	filter := bson.M{"_id": id}
 	update := bson.M{
 		"$set": bson.M{
-			"KodeDosen":   kode,
-			"Nama":        nama,
-			"PhoneNumber": hp,
+			"kode_dosen":   kode,
+			"nama":         nama,
+			"phone_number": hp,
 		}}
 
 	result, err := db.Collection("dosen").UpdateOne(context.Background(), filter, update)
@@ -353,7 +353,7 @@ func InsertMatkul(db *mongo.Database, kode string, nama string, sks int, dosen m
 func GetMatkulFromKodeMatkul(db *mongo.Database, kode string) (matkul model.MataKuliah, errs error) {
 	data_matkul := db.Collection("matkul")
 	filter := bson.M{"kode_matkul": kode}
-	err := data_matkul.FindOne(context.TODO(), filter).Decode(&data_matkul)
+	err := data_matkul.FindOne(context.TODO(), filter).Decode(&matkul)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return matkul, fmt.Errorf("no data found for kode %s", kode)
@@ -377,7 +377,7 @@ func GetMatkulFromID(db *mongo.Database, _id primitive.ObjectID) (matkul model.M
 }
 
 func GetMatkulAll(db *mongo.Database) (matkul []model.MataKuliah) {
-	data_matkul := db.Collection("dosen")
+	data_matkul := db.Collection("matkul")
 	filter := bson.D{}
 	// var results []mhs
 	cur, err := data_matkul.Find(context.TODO(), filter)
@@ -395,10 +395,10 @@ func UpdateMatkulFromID(db *mongo.Database, id primitive.ObjectID, kode string, 
 	filter := bson.M{"_id": id}
 	update := bson.M{
 		"$set": bson.M{
-			"KodeMatkul": kode,
-			"Nama":       nama,
-			"Sks":        sks,
-			"Dosen":      dosen,
+			"kode_matkul": kode,
+			"nama":        nama,
+			"sks":         sks,
+			"dosen":       dosen,
 		}}
 
 	result, err := db.Collection("matkul").UpdateOne(context.Background(), filter, update)
@@ -443,7 +443,7 @@ func InsertFakultas(db *mongo.Database, kode string, nama string) (insertedID pr
 	return insertedID, nil
 }
 
-func GetFakultasFromKodeFakultas(db *mongo.Database, kode string) (fakultas model.MataKuliah, errs error) {
+func GetFakultasFromKodeFakultas(db *mongo.Database, kode string) (fakultas model.Fakultas, errs error) {
 	data_fakultas := MongoConnect("db_dhs_tb").Collection("fakultas")
 	filter := bson.M{"kode_fakultas": kode}
 	err := data_fakultas.FindOne(context.TODO(), filter).Decode(&fakultas)
@@ -456,9 +456,9 @@ func GetFakultasFromKodeFakultas(db *mongo.Database, kode string) (fakultas mode
 	return fakultas, nil
 }
 
-func GetFakultasFromID(db *mongo.Database, _id primitive.ObjectID) (fakultas model.MataKuliah, errs error) {
+func GetFakultasFromID(db *mongo.Database, _id primitive.ObjectID) (fakultas model.Fakultas, errs error) {
 	data_fakultas := MongoConnect("db_dhs_tb").Collection("fakultas")
-	filter := bson.M{"kode_fakultas": _id}
+	filter := bson.M{"_id": _id}
 	err := data_fakultas.FindOne(context.TODO(), filter).Decode(&fakultas)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -469,7 +469,7 @@ func GetFakultasFromID(db *mongo.Database, _id primitive.ObjectID) (fakultas mod
 	return fakultas, nil
 }
 
-func GetFakultasAll(db *mongo.Database) (fakultas []model.MataKuliah) {
+func GetFakultasAll(db *mongo.Database) (fakultas []model.Fakultas) {
 	data_mhs := MongoConnect("db_dhs_tb").Collection("fakultas")
 	filter := bson.D{}
 	// var results []mhs
@@ -488,8 +488,8 @@ func UpdateFakultasFromID(db *mongo.Database, id primitive.ObjectID, kode string
 	filter := bson.M{"_id": id}
 	update := bson.M{
 		"$set": bson.M{
-			"KodeFakultas": kode,
-			"Nama":         nama,
+			"kode_fakultas": kode,
+			"nama":          nama,
 		}}
 	var fakultas model.Fakultas
 	fakultas.KodeFakultas = kode
@@ -528,7 +528,7 @@ func InsertProdi(db *mongo.Database, kode string, nama string) (insertedID primi
 	var programStudi model.ProgramStudi
 	programStudi.KodeProgramStudi = kode
 	programStudi.Nama = nama
-	result, err := db.Collection("prodi").InsertOne(context.Background(), programStudi)
+	result, err := db.Collection("programStudi").InsertOne(context.Background(), programStudi)
 	if err != nil {
 		fmt.Printf("InsertProdi: %v\n", err)
 		return
@@ -537,9 +537,9 @@ func InsertProdi(db *mongo.Database, kode string, nama string) (insertedID primi
 	return insertedID, nil
 }
 
-func GetProdiFromKodeProdi(db *mongo.Database, kode string) (programStudi model.MataKuliah) {
+func GetProdiFromKodeProdi(db *mongo.Database, kode string) (programStudi model.ProgramStudi) {
 	data_dhs := MongoConnect("db_dhs_tb").Collection("programStudi")
-	filter := bson.M{"kode_programStudi": kode}
+	filter := bson.M{"kode_program_studi": kode}
 	err := data_dhs.FindOne(context.TODO(), filter).Decode(&programStudi)
 	if err != nil {
 		fmt.Printf("GetProdiFromKodeProdi: %v\n", err)
@@ -548,8 +548,8 @@ func GetProdiFromKodeProdi(db *mongo.Database, kode string) (programStudi model.
 }
 
 func GetProdiFromID(db *mongo.Database, _id primitive.ObjectID) (prodi model.ProgramStudi, errs error) {
-	data_prodi := MongoConnect("db_dhs_tb").Collection("prodi")
-	filter := bson.M{"kode_prodi": _id}
+	data_prodi := MongoConnect("db_dhs_tb").Collection("programStudi")
+	filter := bson.M{"_id": _id}
 	err := data_prodi.FindOne(context.TODO(), filter).Decode(&prodi)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -560,7 +560,7 @@ func GetProdiFromID(db *mongo.Database, _id primitive.ObjectID) (prodi model.Pro
 	return prodi, nil
 }
 
-func GetProdiAll(db *mongo.Database) (programStudi []model.MataKuliah) {
+func GetProdiAll(db *mongo.Database) (programStudi []model.ProgramStudi) {
 	data_mhs := MongoConnect("db_dhs_tb").Collection("programStudi")
 	filter := bson.D{}
 	// var results []mhs
@@ -575,12 +575,12 @@ func GetProdiAll(db *mongo.Database) (programStudi []model.MataKuliah) {
 	return programStudi
 }
 
-func UpdateProdiAll(db *mongo.Database, id primitive.ObjectID, kode string, nama string) (err error) {
+func UpdateProdiByID(db *mongo.Database, id primitive.ObjectID, kode string, nama string) (err error) {
 	filter := bson.M{"_id": id}
 	update := bson.M{
 		"$set": bson.M{
-			"KodeProgramStudi": kode,
-			"Nama":             nama,
+			"kode_program_studi": kode,
+			"nama":               nama,
 		}}
 
 	result, err := db.Collection("programStudi").UpdateOne(context.Background(), filter, update)
