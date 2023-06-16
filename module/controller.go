@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/aiteung/atdb"
@@ -63,15 +64,18 @@ func InsertDHS(db *mongo.Database, mahasiswa model.Mahasiswa, mata_kuliah []mode
 	return insertedID, nil
 }
 
-func GetDhsFromNPM(db *mongo.Database, npm int) (dhs model.Dhs) {
+func GetDhsFromNPM(db *mongo.Database, npm int) (dhs model.Dhs, errs error) {
 
-	data_dhs := MongoConnect("db_dhs_tb").Collection("dhs")
+	data := db.Collection("dhs")
 	filter := bson.M{"mahasiswa.npm": npm}
-	err := data_dhs.FindOne(context.TODO(), filter).Decode(&dhs)
+	err := data.FindOne(context.TODO(), filter).Decode(&dhs)
 	if err != nil {
-		fmt.Printf("GetDhsFromNPM: %v\n", err)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return dhs, fmt.Errorf("no data found for npm %s", strconv.Itoa(npm))
+		}
+		return dhs, fmt.Errorf("error retrieving data for npm %s: %s", strconv.Itoa(npm), err.Error())
 	}
-	return dhs
+	return dhs, nil
 }
 
 func GetDhsFromID(db *mongo.Database, _id primitive.ObjectID) (hasil model.Dhs, errs error) {
@@ -102,8 +106,45 @@ func GetDhsAll(db *mongo.Database) (dhs []model.Dhs) {
 	return dhs
 }
 
+func UpdateDhsById(db *mongo.Database, id primitive.ObjectID, mahasiswa model.Mahasiswa, mata_kuliah []model.NilaiMataKuliah) (err error) {
+	filter := bson.M{"_id": id}
+	update := bson.M{
+		"$set": bson.M{
+			"mahasiswa":   mahasiswa,
+			"mata_kuliah": mata_kuliah,
+			"created_at":  primitive.NewDateTimeFromTime(time.Now().UTC()),
+		},
+	}
+	result, err := db.Collection("dhs").UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		fmt.Printf("UpdatePresensi: %v\n", err)
+		return
+	}
+	if result.ModifiedCount == 0 {
+		err = errors.New("No data has been changed with the specified ID")
+		return
+	}
+	return nil
+}
+
+func DeleteDhsByID(db *mongo.Database, _id primitive.ObjectID) error {
+	karyawan := db.Collection("dhs")
+	filter := bson.M{"_id": _id}
+
+	result, err := karyawan.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return fmt.Errorf("error deleting data for ID %s: %s", _id, err.Error())
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("data with ID %s not found", _id)
+	}
+
+	return nil
+}
+
 // mahasiswa
-func InsertMhs(npm int, nama string, fakultas model.Fakultas, dosen model.Dosen, programStudi model.ProgramStudi) (InsertedID interface{}) {
+func InsertMhs(db *mongo.Database, npm int, nama string, fakultas model.Fakultas, dosen model.Dosen, programStudi model.ProgramStudi) (insertedID primitive.ObjectID, err error) {
 	var mhs model.Mahasiswa
 	mhs.Npm = npm
 	mhs.Nama = nama
@@ -111,26 +152,49 @@ func InsertMhs(npm int, nama string, fakultas model.Fakultas, dosen model.Dosen,
 	mhs.DosenWali = dosen
 	mhs.ProgramStudi = programStudi
 	// mhs.CreatedAt = primitive.NewDateTimeFromTime(time.Now().UTC())
-	return InsertOneDoc("db_dhs_tb", "mahasiswa", mhs)
+	// return InsertOneDoc("db_dhs_tb", "mahasiswa", mhs)
+	result, err := db.Collection("dhs").InsertOne(context.Background(), mhs)
+	if err != nil {
+		fmt.Printf("InsertPresensi: %v\n", err)
+		return
+	}
+	insertedID = result.InsertedID.(primitive.ObjectID)
+	return insertedID, nil
 }
 
-func GetMhsFromNPM(npm int) (mhs model.Mahasiswa) {
-	data_dhs := MongoConnect("db_dhs_tb").Collection("mahasiswa")
+func GetMhsFromNPM(db *mongo.Database, npm int) (mhs model.Mahasiswa, errs error) {
+	data_dhs := db.Collection("mahasiswa")
 	filter := bson.M{"npm": npm}
 	err := data_dhs.FindOne(context.TODO(), filter).Decode(&mhs)
 	if err != nil {
-		fmt.Printf("GetMhsFromNPM: %v\n", err)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return mhs, fmt.Errorf("no data found for npm %s", strconv.Itoa(npm))
+		}
+		return mhs, fmt.Errorf("error retrieving data for npm %s: %s", strconv.Itoa(npm), err.Error())
 	}
-	return mhs
+	return mhs, nil
 }
 
-func GetMhsAll() (mhs []model.Mahasiswa) {
-	data_mhs := MongoConnect("db_dhs_tb").Collection("mahasiswa")
+func GetMhsFromID(db *mongo.Database, _id primitive.ObjectID) (hasil model.Dhs, errs error) {
+	data := db.Collection("mahasiswa")
+	filter := bson.M{"_id": _id}
+	err := data.FindOne(context.TODO(), filter).Decode(&hasil)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return hasil, fmt.Errorf("no data found for ID %s", _id)
+		}
+		return hasil, fmt.Errorf("error retrieving data for ID %s: %s", _id, err.Error())
+	}
+	return hasil, nil
+}
+
+func GetMhsAll(db *mongo.Database) (mhs []model.Mahasiswa) {
+	data_mhs := db.Collection("mahasiswa")
 	filter := bson.D{}
 	// var results []mhs
 	cur, err := data_mhs.Find(context.TODO(), filter)
 	if err != nil {
-		fmt.Printf("GetmhsFromNPM: %v\n", err)
+		fmt.Printf("GetMhsFromNPM: %v\n", err)
 	}
 	err = cur.All(context.TODO(), &mhs)
 	if err != nil {
@@ -139,32 +203,92 @@ func GetMhsAll() (mhs []model.Mahasiswa) {
 	return mhs
 }
 
+func UpdateMhsById(db *mongo.Database, id primitive.ObjectID, npm int, nama string, fakultas model.Fakultas, dosen model.Dosen, programStudi model.ProgramStudi) (err error) {
+	filter := bson.M{"_id": id}
+	update := bson.M{
+		"$set": bson.M{
+			"Npm":          npm,
+			"Nama":         nama,
+			"Fakultas":     fakultas,
+			"DosenWali":    dosen,
+			"ProgramStudi": programStudi,
+		},
+	}
+	result, err := db.Collection("mahasiswa").UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		fmt.Printf("UpdateMahasiswa: %v\n", err)
+		return
+	}
+	if result.ModifiedCount == 0 {
+		err = errors.New("No data has been changed with the specified ID")
+		return
+	}
+	return nil
+}
+
+func DeleteMhsByID(db *mongo.Database, _id primitive.ObjectID) error {
+	mhs := db.Collection("mahasiswa")
+	filter := bson.M{"_id": _id}
+
+	result, err := mhs.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return fmt.Errorf("error deleting data for ID %s: %s", _id, err.Error())
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("data with ID %s not found", _id)
+	}
+
+	return nil
+}
+
 // dosen
-func InsertDosen(kode string, nama string, hp string) (InsertedID interface{}) {
+func InsertDosen(db *mongo.Database, kode string, nama string, hp string) (insertedID primitive.ObjectID, err error) {
 	var dosen model.Dosen
 	dosen.KodeDosen = kode
 	dosen.Nama = nama
 	dosen.PhoneNumber = hp
-	return InsertOneDoc("db_dhs_tb", "dosen", dosen)
+	result, err := db.Collection("dhs").InsertOne(context.Background(), dosen)
+	if err != nil {
+		fmt.Printf("InsertPresensi: %v\n", err)
+		return
+	}
+	insertedID = result.InsertedID.(primitive.ObjectID)
+	return insertedID, nil
 }
 
-func GetDosenFromKodeDosen(kode string) (dosen model.Dosen) {
+func GetDosenFromKodeDosen(db *mongo.Database, kode string) (dosen model.Dosen, errs error) {
 	data_dhs := MongoConnect("db_dhs_tb").Collection("dosen")
 	filter := bson.M{"kode_dosen": kode}
 	err := data_dhs.FindOne(context.TODO(), filter).Decode(&dosen)
 	if err != nil {
-		fmt.Printf("GetDosenFromKodeDosen: %v\n", err)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return dosen, fmt.Errorf("no data found for kode %s", kode)
+		}
+		return dosen, fmt.Errorf("error retrieving data for kode %s: %s", kode, err.Error())
 	}
-	return dosen
+	return dosen, nil
+}
+func GetDosenFromID(db *mongo.Database, id primitive.ObjectID) (dosen model.Dosen, errs error) {
+	data_dhs := MongoConnect("db_dhs_tb").Collection("dosen")
+	filter := bson.M{"kode_dosen": id}
+	err := data_dhs.FindOne(context.TODO(), filter).Decode(&dosen)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return dosen, fmt.Errorf("no data found for id %s", id)
+		}
+		return dosen, fmt.Errorf("error retrieving data for id %s: %s", id, err.Error())
+	}
+	return dosen, nil
 }
 
-func GetDosenAll() (dosen []model.Dosen) {
-	data_mhs := MongoConnect("db_dhs_tb").Collection("dosen")
+func GetDosenAll(db *mongo.Database) (dosen []model.Dosen) {
+	data_dosen := db.Collection("dosen")
 	filter := bson.D{}
 	// var results []mhs
-	cur, err := data_mhs.Find(context.TODO(), filter)
+	cur, err := data_dosen.Find(context.TODO(), filter)
 	if err != nil {
-		fmt.Printf("GetAllDosen: %v\n", err)
+		fmt.Printf("GetMhsFromNPM: %v\n", err)
 	}
 	err = cur.All(context.TODO(), &dosen)
 	if err != nil {
@@ -173,33 +297,92 @@ func GetDosenAll() (dosen []model.Dosen) {
 	return dosen
 }
 
+func UpdateDosenByID(db *mongo.Database, id primitive.ObjectID, kode string, nama string, hp string) (err error) {
+	filter := bson.M{"_id": id}
+	update := bson.M{
+		"$set": bson.M{
+			"KodeDosen":   kode,
+			"Nama":        nama,
+			"PhoneNumber": hp,
+		}}
+
+	result, err := db.Collection("dosen").UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		fmt.Printf("UpdateDosen: %v\n", err)
+		return
+	}
+	if result.ModifiedCount == 0 {
+		err = errors.New("No data has been changed with the specified ID")
+		return
+	}
+	return nil
+}
+
+func DeleteDosenByID(db *mongo.Database, _id primitive.ObjectID) error {
+	dosen := db.Collection("dosen")
+	filter := bson.M{"_id": _id}
+
+	result, err := dosen.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return fmt.Errorf("error deleting data for ID %s: %s", _id, err.Error())
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("data with ID %s not found", _id)
+	}
+
+	return nil
+}
+
 // matkul
-func InsertMatkul(kode string, nama string, sks int, dosen model.Dosen) (InsertedID interface{}) {
+func InsertMatkul(db *mongo.Database, kode string, nama string, sks int, dosen model.Dosen) (insertedID primitive.ObjectID, err error) {
 	var matkul model.MataKuliah
 	matkul.KodeMatkul = kode
 	matkul.Nama = nama
 	matkul.Sks = sks
 	matkul.Dosen = dosen
-	return InsertOneDoc("db_dhs_tb", "matkul", matkul)
-}
-
-func GetMatkulFromKodeMatkul(kode string) (matkul model.MataKuliah) {
-	data_dhs := MongoConnect("db_dhs_tb").Collection("matkul")
-	filter := bson.M{"kode_matkul": kode}
-	err := data_dhs.FindOne(context.TODO(), filter).Decode(&matkul)
+	result, err := db.Collection("matkul").InsertOne(context.Background(), matkul)
 	if err != nil {
-		fmt.Printf("GetMatkulFromKodeMatkul: %v\n", err)
+		fmt.Printf("InsertMatkul: %v\n", err)
+		return
 	}
-	return matkul
+	insertedID = result.InsertedID.(primitive.ObjectID)
+	return insertedID, nil
 }
 
-func GetMatkulAll() (matkul []model.MataKuliah) {
-	data_mhs := MongoConnect("db_dhs_tb").Collection("matkul")
+func GetMatkulFromKodeMatkul(db *mongo.Database, kode string) (matkul model.MataKuliah, errs error) {
+	data_matkul := db.Collection("matkul")
+	filter := bson.M{"kode_matkul": kode}
+	err := data_matkul.FindOne(context.TODO(), filter).Decode(&data_matkul)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return matkul, fmt.Errorf("no data found for kode %s", kode)
+		}
+		return matkul, fmt.Errorf("error retrieving data for kode %s: %s", kode, err.Error())
+	}
+	return matkul, nil
+}
+
+func GetMatkulFromID(db *mongo.Database, _id primitive.ObjectID) (matkul model.MataKuliah, errs error) {
+	data_matkul := db.Collection("matkul")
+	filter := bson.M{"_id": _id}
+	err := data_matkul.FindOne(context.TODO(), filter).Decode(&matkul)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return matkul, fmt.Errorf("no data found for _id %s", _id)
+		}
+		return matkul, fmt.Errorf("error retrieving data for _id %s: %s", _id, err.Error())
+	}
+	return matkul, nil
+}
+
+func GetMatkulAll(db *mongo.Database) (matkul []model.MataKuliah) {
+	data_matkul := db.Collection("dosen")
 	filter := bson.D{}
 	// var results []mhs
-	cur, err := data_mhs.Find(context.TODO(), filter)
+	cur, err := data_matkul.Find(context.TODO(), filter)
 	if err != nil {
-		fmt.Printf("GetMatkulAll: %v\n", err)
+		fmt.Printf("GetMhsFromMatkul: %v\n", err)
 	}
 	err = cur.All(context.TODO(), &matkul)
 	if err != nil {
@@ -208,31 +391,91 @@ func GetMatkulAll() (matkul []model.MataKuliah) {
 	return matkul
 }
 
+func UpdateMatkulFromID(db *mongo.Database, id primitive.ObjectID, kode string, nama string, sks int, dosen model.Dosen) (err error) {
+	filter := bson.M{"_id": id}
+	update := bson.M{
+		"$set": bson.M{
+			"KodeMatkul": kode,
+			"Nama":       nama,
+			"Sks":        sks,
+			"Dosen":      dosen,
+		}}
+
+	result, err := db.Collection("matkul").UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		fmt.Printf("UpdateMatkul: %v\n", err)
+		return
+	}
+	if result.ModifiedCount == 0 {
+		err = errors.New("No data has been changed with the specified ID")
+		return
+	}
+	return nil
+}
+
+func DeleteMatkulByID(db *mongo.Database, _id primitive.ObjectID) error {
+	dosen := db.Collection("matkul")
+	filter := bson.M{"_id": _id}
+
+	result, err := dosen.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return fmt.Errorf("error deleting data for ID %s: %s", _id, err.Error())
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("data with ID %s not found", _id)
+	}
+
+	return nil
+}
+
 // fakultas
-func InsertFakultas(kode string, nama string) (InsertedID interface{}) {
+func InsertFakultas(db *mongo.Database, kode string, nama string) (insertedID primitive.ObjectID, err error) {
 	var fakultas model.Fakultas
 	fakultas.KodeFakultas = kode
 	fakultas.Nama = nama
-	return InsertOneDoc("db_dhs_tb", "fakultas", fakultas)
-}
-
-func GetFakultasFromKodeFakultas(kode string) (fakultas model.MataKuliah) {
-	data_dhs := MongoConnect("db_dhs_tb").Collection("fakultas")
-	filter := bson.M{"kode_fakultas": kode}
-	err := data_dhs.FindOne(context.TODO(), filter).Decode(&fakultas)
+	result, err := db.Collection("fakultas").InsertOne(context.Background(), fakultas)
 	if err != nil {
-		fmt.Printf("GetFakultasFromKodeFakultas: %v\n", err)
+		fmt.Printf("InsertFakultas: %v\n", err)
+		return
 	}
-	return fakultas
+	insertedID = result.InsertedID.(primitive.ObjectID)
+	return insertedID, nil
 }
 
-func GetFakultasAll() (fakultas []model.MataKuliah) {
+func GetFakultasFromKodeFakultas(db *mongo.Database, kode string) (fakultas model.MataKuliah, errs error) {
+	data_fakultas := MongoConnect("db_dhs_tb").Collection("fakultas")
+	filter := bson.M{"kode_fakultas": kode}
+	err := data_fakultas.FindOne(context.TODO(), filter).Decode(&fakultas)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return fakultas, fmt.Errorf("no data found for kode %s", kode)
+		}
+		return fakultas, fmt.Errorf("error retrieving data for kode %s: %s", kode, err.Error())
+	}
+	return fakultas, nil
+}
+
+func GetFakultasFromID(db *mongo.Database, _id primitive.ObjectID) (fakultas model.MataKuliah, errs error) {
+	data_fakultas := MongoConnect("db_dhs_tb").Collection("fakultas")
+	filter := bson.M{"kode_fakultas": _id}
+	err := data_fakultas.FindOne(context.TODO(), filter).Decode(&fakultas)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return fakultas, fmt.Errorf("no data found for _id %s", _id)
+		}
+		return fakultas, fmt.Errorf("error retrieving data for _Id %s: %s", _id, err.Error())
+	}
+	return fakultas, nil
+}
+
+func GetFakultasAll(db *mongo.Database) (fakultas []model.MataKuliah) {
 	data_mhs := MongoConnect("db_dhs_tb").Collection("fakultas")
 	filter := bson.D{}
 	// var results []mhs
 	cur, err := data_mhs.Find(context.TODO(), filter)
 	if err != nil {
-		fmt.Printf("GetFakultasAll: %v\n", err)
+		fmt.Printf("GetMhsFromFakultas: %v\n", err)
 	}
 	err = cur.All(context.TODO(), &fakultas)
 	if err != nil {
@@ -241,15 +484,60 @@ func GetFakultasAll() (fakultas []model.MataKuliah) {
 	return fakultas
 }
 
+func UpdateFakultasFromID(db *mongo.Database, id primitive.ObjectID, kode string, nama string) (err error) {
+	filter := bson.M{"_id": id}
+	update := bson.M{
+		"$set": bson.M{
+			"KodeFakultas": kode,
+			"Nama":         nama,
+		}}
+	var fakultas model.Fakultas
+	fakultas.KodeFakultas = kode
+	fakultas.Nama = nama
+
+	result, err := db.Collection("fakultas").UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		fmt.Printf("UpdateFakultas: %v\n", err)
+		return
+	}
+	if result.ModifiedCount == 0 {
+		err = errors.New("No data has been changed with the specified ID")
+		return
+	}
+	return nil
+}
+
+func DeleteFakultasFromID(db *mongo.Database, _id primitive.ObjectID) error {
+	fakultas := db.Collection("fakultas")
+	filter := bson.M{"_id": _id}
+
+	result, err := fakultas.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return fmt.Errorf("error deleting data for ID %s: %s", _id, err.Error())
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("data with ID %s not found", _id)
+	}
+
+	return nil
+}
+
 // prodi
-func InsertProdi(kode string, nama string) (InsertedID interface{}) {
+func InsertProdi(db *mongo.Database, kode string, nama string) (insertedID primitive.ObjectID, err error) {
 	var programStudi model.ProgramStudi
 	programStudi.KodeProgramStudi = kode
 	programStudi.Nama = nama
-	return InsertOneDoc("db_dhs_tb", "programStudi", programStudi)
+	result, err := db.Collection("prodi").InsertOne(context.Background(), programStudi)
+	if err != nil {
+		fmt.Printf("InsertProdi: %v\n", err)
+		return
+	}
+	insertedID = result.InsertedID.(primitive.ObjectID)
+	return insertedID, nil
 }
 
-func GetProdiFromKodeProdi(kode string) (programStudi model.MataKuliah) {
+func GetProdiFromKodeProdi(db *mongo.Database, kode string) (programStudi model.MataKuliah) {
 	data_dhs := MongoConnect("db_dhs_tb").Collection("programStudi")
 	filter := bson.M{"kode_programStudi": kode}
 	err := data_dhs.FindOne(context.TODO(), filter).Decode(&programStudi)
@@ -259,7 +547,20 @@ func GetProdiFromKodeProdi(kode string) (programStudi model.MataKuliah) {
 	return programStudi
 }
 
-func GetProdiAll() (programStudi []model.MataKuliah) {
+func GetProdiFromID(db *mongo.Database, _id primitive.ObjectID) (prodi model.ProgramStudi, errs error) {
+	data_prodi := MongoConnect("db_dhs_tb").Collection("prodi")
+	filter := bson.M{"kode_prodi": _id}
+	err := data_prodi.FindOne(context.TODO(), filter).Decode(&prodi)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return prodi, fmt.Errorf("no data found for _id %s", _id)
+		}
+		return prodi, fmt.Errorf("error retrieving data for _Id %s: %s", _id, err.Error())
+	}
+	return prodi, nil
+}
+
+func GetProdiAll(db *mongo.Database) (programStudi []model.MataKuliah) {
 	data_mhs := MongoConnect("db_dhs_tb").Collection("programStudi")
 	filter := bson.D{}
 	// var results []mhs
@@ -272,4 +573,40 @@ func GetProdiAll() (programStudi []model.MataKuliah) {
 		fmt.Println(err)
 	}
 	return programStudi
+}
+
+func UpdateProdiAll(db *mongo.Database, id primitive.ObjectID, kode string, nama string) (err error) {
+	filter := bson.M{"_id": id}
+	update := bson.M{
+		"$set": bson.M{
+			"KodeProgramStudi": kode,
+			"Nama":             nama,
+		}}
+
+	result, err := db.Collection("programStudi").UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		fmt.Printf("UpdateProdi: %v\n", err)
+		return
+	}
+	if result.ModifiedCount == 0 {
+		err = errors.New("No data has been changed with the specified ID")
+		return
+	}
+	return nil
+}
+
+func DeleteProdiAll(db *mongo.Database, _id primitive.ObjectID) error {
+	programStudi := db.Collection("programStudi")
+	filter := bson.M{"_id": _id}
+
+	result, err := programStudi.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return fmt.Errorf("error deleting data for ID %s: %s", _id, err.Error())
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("data with ID %s not found", _id)
+	}
+
+	return nil
 }
