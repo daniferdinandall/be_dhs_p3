@@ -440,7 +440,10 @@ func TestInsertProdi(t *testing.T) {
 
 func TestProdiFromKodeProdi(t *testing.T) {
 	kode := "D4TI"
-	biodata := module.GetProdiFromKodeProdi(module.MongoConn, kode)
+	biodata, err := module.GetProdiFromKodeProdi(module.MongoConn, kode)
+	if err != nil {
+		fmt.Printf("Error get data: %v", err)
+	}
 	fmt.Println(biodata)
 }
 func TestProdiFromID(t *testing.T) {

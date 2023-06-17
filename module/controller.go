@@ -537,14 +537,20 @@ func InsertProdi(db *mongo.Database, kode string, nama string) (insertedID primi
 	return insertedID, nil
 }
 
-func GetProdiFromKodeProdi(db *mongo.Database, kode string) (programStudi model.ProgramStudi) {
+func GetProdiFromKodeProdi(db *mongo.Database, kode string) (programStudi model.ProgramStudi, errs error) {
 	data_dhs := MongoConnect("db_dhs_tb").Collection("programStudi")
 	filter := bson.M{"kode_program_studi": kode}
 	err := data_dhs.FindOne(context.TODO(), filter).Decode(&programStudi)
 	if err != nil {
-		fmt.Printf("GetProdiFromKodeProdi: %v\n", err)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return programStudi, fmt.Errorf("no data found for kode %s", kode)
+		}
+		return programStudi, fmt.Errorf("error retrieving data for kode %s: %s", kode, err.Error())
 	}
-	return programStudi
+	// if err != nil {
+	// 	fmt.Printf("GetProdiFromKodeProdi: %v\n", err)
+	// }
+	return programStudi, nil
 }
 
 func GetProdiFromID(db *mongo.Database, _id primitive.ObjectID) (prodi model.ProgramStudi, errs error) {
