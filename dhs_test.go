@@ -478,7 +478,7 @@ func TestDeleteProdi(t *testing.T) {
 	if err != nil {
 		fmt.Printf("Data tidak berhasil disimpan dengan id")
 	} else {
-		biodata := module.DeleteProdiAll(module.MongoConn, id)
+		biodata := module.DeleteProdiByID(module.MongoConn, id)
 		fmt.Println(biodata)
 	}
 }

@@ -601,7 +601,7 @@ func UpdateProdiByID(db *mongo.Database, id primitive.ObjectID, kode string, nam
 	return nil
 }
 
-func DeleteProdiAll(db *mongo.Database, _id primitive.ObjectID) error {
+func DeleteProdiByID(db *mongo.Database, _id primitive.ObjectID) error {
 	programStudi := db.Collection("programStudi")
 	filter := bson.M{"_id": _id}
 
