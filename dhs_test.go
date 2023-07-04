@@ -37,6 +37,9 @@ func TestInsertDhs(t *testing.T) {
 			Nama:       "ALGORITMA DAN STRUKTUR DATA I",
 			Sks:        3,
 			Nilai:      "A",
+			Dosen: model.Dosen{
+				Nama: "Rd. NURAINI SITI FATHONAH, S.S., M.Hum.,SFPC",
+			},
 		}, {
 			KodeMatkul: "TI41092",
 			Nama:       "ALJABAR LINIER",
@@ -224,7 +227,7 @@ func TestEditMhs(t *testing.T) {
 		Nama:        "Rd. NURAINI SITI FATHONAH, S.S., M.Hum.,SFPC",
 	}
 
-	id, err := primitive.ObjectIDFromHex("648c27037b1ba3b82b383d06")
+	id, err := primitive.ObjectIDFromHex("64a48461264f627c94392ac2")
 	if err != nil {
 		fmt.Printf("Data tidak berhasil disimpan dengan id")
 	} else {

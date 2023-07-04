@@ -210,8 +210,8 @@ func UpdateMhsById(db *mongo.Database, id primitive.ObjectID, npm int, nama stri
 			"npm":           npm,
 			"nama":          nama,
 			"fakultas":      fakultas,
-			"program_studi": dosen,
-			"dosen_wali":    programStudi,
+			"program_studi": programStudi,
+			"dosen_wali":    dosen,
 		},
 	}
 	result, err := db.Collection("mahasiswa").UpdateOne(context.Background(), filter, update)
