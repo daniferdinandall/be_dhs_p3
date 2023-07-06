@@ -1,7 +1,6 @@
 package namapackage
 
 import (
-	"github.com/dgrijalva/jwt-go"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -66,9 +65,6 @@ type User struct {
 	Role     string             `bson:"roles,omitempty" json:"roles,omitempty"`
 }
 
-type MyClaims struct {
-	UserID int64  `json:"userId"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
-	jwt.StandardClaims
+type Token struct {
+	Token_String string `bson:"tokenstring,omitempty" json:"tokenstring,omitempty"`
 }
