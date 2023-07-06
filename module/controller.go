@@ -73,7 +73,7 @@ func ValidateUserFromEmail(db *mongo.Database, email string, password string) (u
 	err := data.FindOne(context.TODO(), filter).Decode(&user)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return user, "gagal", fmt.Errorf("no data found for email %s", email)
+			return user, "gagal", fmt.Errorf("Tidak Ditemukan Email untuk %s", email)
 		}
 		return user, "gagal", fmt.Errorf("error retrieving data for email %s: %s", email, err.Error())
 	}
