@@ -14,6 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var MongoString string = os.Getenv("MONGOSTRING")
@@ -42,6 +43,54 @@ func InsertOneDoc(db string, collection string, doc interface{}) (insertedID int
 		fmt.Printf("InsertOneDoc: %v\n", err)
 	}
 	return insertResult.InsertedID
+}
+
+// Auth
+func InsertUser(db *mongo.Database, nama string, email string, password string, role string) (insertedID primitive.ObjectID, err error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		fmt.Println("Error generating hashed password:", err)
+		return
+	}
+	user := bson.M{
+		"nama":     nama,
+		"email":    email,
+		"password": string(hashedPassword),
+		"role":     role,
+	}
+	result, err := db.Collection("user").InsertOne(context.Background(), user)
+	if err != nil {
+		fmt.Printf("InsertUser: %v\n", err)
+		return
+	}
+	insertedID = result.InsertedID.(primitive.ObjectID)
+	return insertedID, nil
+}
+
+func ValidateUserFromEmail(db *mongo.Database, email string, password string) (user model.User, message string, errs error) {
+	data := db.Collection("user")
+	filter := bson.M{"email": email}
+	err := data.FindOne(context.TODO(), filter).Decode(&user)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return user, "gagal", fmt.Errorf("no data found for email %s", email)
+		}
+		return user, "gagal", fmt.Errorf("error retrieving data for email %s: %s", email, err.Error())
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err == nil {
+		// Password cocok
+		return user, "berhasil", nil
+	} else if err == bcrypt.ErrMismatchedHashAndPassword {
+		// Password tidak cocok
+		return user, "gagal", fmt.Errorf("Password tidak cocok %s", email)
+		// fmt.Println("Password tidak cocok")
+	} else {
+		// Terjadi kesalahan lain
+		return user, "gagal", fmt.Errorf("Terjadi kesalahan %s", err)
+		// fmt.Println("Terjadi kesalahan:", err)
+	}
 }
 
 // dhs

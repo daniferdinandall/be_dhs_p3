@@ -12,6 +12,38 @@ import (
 
 // ========================
 // DHS
+
+// ========================
+// auth
+func TestInsertUser(t *testing.T) {
+	user := model.User{
+		Nama:     "Admin",
+		Email:    "admins@mail.com",
+		Password: "123456789",
+		Role:     "admin",
+	}
+	insertedID, err := module.InsertUser(module.MongoConn, user.Nama, user.Email, user.Password, user.Role)
+	if err != nil {
+		t.Errorf("Error inserting data: %v", err)
+	}
+	fmt.Printf("Data berhasil disimpan dengan id %s", insertedID.Hex())
+}
+
+func TestValidateUser(t *testing.T) {
+	user := model.User{
+		Nama:     "Admin",
+		Email:    "admins@mail.com",
+		Password: "123456789",
+	}
+	user, message, err := module.ValidateUserFromEmail(module.MongoConn, user.Email, user.Password)
+	fmt.Printf(message)
+	if err != nil {
+		t.Errorf("Error inserting data: %v", err)
+	} else {
+		fmt.Println(user)
+	}
+}
+
 // dhs
 func TestInsertDhs(t *testing.T) {
 	mahasiswa := model.Mahasiswa{

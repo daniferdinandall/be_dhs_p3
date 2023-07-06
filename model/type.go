@@ -1,6 +1,7 @@
 package namapackage
 
 import (
+	"github.com/dgrijalva/jwt-go"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -55,4 +56,19 @@ type ProgramStudi struct {
 	ID               primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
 	KodeProgramStudi string             `bson:"kode_program_studi,omitempty" json:"kode_program_studi,omitempty"`
 	Nama             string             `bson:"nama,omitempty" json:"nama,omitempty"`
+}
+
+type User struct {
+	ID       primitive.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
+	Nama     string             `bson:"nama,omitempty" json:"nama,omitempty"`
+	Email    string             `bson:"email,omitempty" json:"email,omitempty"`
+	Password string             `bson:"password,omitempty" json:"password,omitempty"`
+	Role     string             `bson:"roles,omitempty" json:"roles,omitempty"`
+}
+
+type MyClaims struct {
+	UserID int64  `json:"userId"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
+	jwt.StandardClaims
 }
